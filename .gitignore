@@ -1,0 +1,16 @@
+# CMake build artifacts
+build/
+bin/
+out/
+*.o
+*.out
+*.exe
+*.obj
+
+# MacOS specific files
+.DS_Store
+
+# IDE specific files
+.vscode/
+.vs/
+*.user
