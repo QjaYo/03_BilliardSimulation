@@ -18,15 +18,15 @@ Mesh::~Mesh() {
 
 void Mesh::setupMesh()
 {
-  glGenVertexArrays(1, &this->VAO);
-  glGenBuffers(1, &this->VBO);
-  glGenBuffers(1, &this->EBO);
+  glGenVertexArrays(1, &VAO);
+  glGenBuffers(1, &VBO);
+  glGenBuffers(1, &EBO);
 
   glBindVertexArray(VAO);
-  glBindBuffer(GL_ARRAY_BUFFER, this->VBO);
+  glBindBuffer(GL_ARRAY_BUFFER, VBO);
   glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
 
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->EBO);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
 
   glEnableVertexAttribArray(0);
@@ -46,7 +46,7 @@ void Mesh::setupMesh()
 
 void Mesh::draw(const Shader &shader) const
 {
-  glBindVertexArray(this->VAO);
+  glBindVertexArray(VAO);
   glDrawElements(GL_TRIANGLES, (unsigned int)indices.size(), GL_UNSIGNED_INT, 0);
   glBindVertexArray(0);
 }

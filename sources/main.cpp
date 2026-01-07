@@ -21,7 +21,8 @@
 #include "texture.h"
 #include "object.h"
 
-// setttings
+// settings
+GLFWwindow *window;
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
@@ -58,7 +59,179 @@ Mesh *sphereMesh;
 Mesh *cubeMesh;
 Mesh *quadMesh;
 
-// Functions
+// Materials
+Material *redBilliardBallMaterial;
+Material *whiteLightMaterial;
+Material *groundMaterial;
+
+// Function Declarations
+GLFWwindow *initOpenGL(const std::string &title, int width, int height);
+void initCallbacks();
+void initShaders();
+void initMeshes();
+void initMaterials();
+void initObjects();
+
+void update();
+void updateTime();
+void checkCollisions();
+
+void renderScene();
+void drawStaticScene();
+void drawDynamicScene();
+void drawUI();
+
+void setUniforms_global(Shader &shader);
+void setUniforms_light(Shader &shader);
+
+int main()
+{
+  window = initOpenGL("OpenGL Project", SCR_WIDTH, SCR_HEIGHT);
+  if (window == nullptr)
+    return -1;
+  glEnable(GL_DEPTH_TEST);
+
+  initCallbacks();
+  initShaders();
+  initMeshes();
+  initMaterials();
+  initObjects();
+
+  while (!glfwWindowShouldClose(window))
+  {
+    processInput(window);
+    update();
+    renderScene();
+
+    glfwSwapBuffers(window);
+    glfwPollEvents();
+  }
+
+  delete phongShader;
+  delete lightShader;
+  delete cubemapShader;
+
+  delete sphereMesh;
+  delete cubeMesh;
+  delete quadMesh;
+
+  glfwTerminate();
+  return 0;
+}
+
+
+GLFWwindow *initOpenGL(const std::string &title, int width, int height)
+{
+  glfwInit();
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#ifdef __APPLE__
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+#endif
+
+  GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", nullptr, nullptr);
+  if (window == nullptr)
+  {
+    std::cout << "Failed to create GLFW window" << std::endl;
+    glfwTerminate();
+    return nullptr;
+  }
+  glfwMakeContextCurrent(window);
+
+  if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+  {
+    std::cout << "Failed to initialize GLAD" << std::endl;
+    return nullptr;
+  }
+
+  return window;
+}
+
+void initCallbacks()
+{
+  glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+  glfwSetScrollCallback(window, scroll_callback);
+}
+
+void initShaders()
+{
+  phongShader = new Shader(SHADER_PATH "phong_vshader.glsl", SHADER_PATH "phong_fshader.glsl");
+  lightShader = new Shader(SHADER_PATH "light_vshader.glsl", SHADER_PATH "light_fshader.glsl");
+  cubemapShader = new Shader(SHADER_PATH "cubemap_vshader.glsl", SHADER_PATH "cubemap_fshader.glsl");
+}
+
+void initMeshes()
+{
+  sphereMesh = ShapeGenerator::createSphere();
+  cubeMesh = ShapeGenerator::createCube();
+  quadMesh = ShapeGenerator::createQuad();
+}
+
+void initMaterials()
+{
+  redBilliardBallMaterial = new Material(
+    glm::vec4(1.0f, 0.0f, 0.0f, 1.0f),
+    glm::vec3(0.1f),
+    glm::vec3(0.5f),
+    glm::vec3(0.5f),
+    72.0f
+  );
+
+  whiteLightMaterial = new Material(
+    glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
+    glm::vec3(0.1f),
+    glm::vec3(0.5f),
+    glm::vec3(0.5f),
+    72.0f
+  );
+
+  groundMaterial = new Material(
+    glm::vec4(0.4f, 0.6f, 0.3f, 1.0f),
+    glm::vec3(0.1f),
+    glm::vec3(0.5f),
+    glm::vec3(0.0f),
+    72.0f
+  );
+}
+
+void initObjects()
+{
+  // Set Lights
+  lights.push_back(
+    Light(
+      Object(
+        TransformData { glm::vec3(0.0f, 30.0f, 0.0f), glm::vec3(0.0f), glm::vec3(1.0f) },
+        RenderData { lightShader, sphereMesh, whiteLightMaterial },
+        PhysicsData {}
+      ),
+      1.0f
+    )
+  );
+
+  // Ground
+  ground = Object(
+    TransformData { glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(90.0f, 0.0f, 0.0f), glm::vec3(100.0f, 100.0f, 0.5f) },
+    RenderData { phongShader, cubeMesh, groundMaterial },
+    PhysicsData {}
+  );
+}
+
+
+void updateTime()
+{
+  float current_time = static_cast<float>(glfwGetTime());
+  dt = current_time - last_time;
+  last_time = current_time;
+  if (b_play)
+    accumulated_time += dt;
+}
+
+void update()
+{
+  updateTime();
+}
+
 void setUniforms_global(Shader &shader)
 {
   shader.use();
@@ -83,52 +256,14 @@ void setUniforms_light(Shader &shader)
   {
     std::string name = "lights[" + std::to_string(i) + "]";
     shader.setLight(name, lights[i]);
-    shader.setFloat("lightRadius[" + std::to_string(i) + "]", lights[i].object.scale.x);
+    shader.setFloat("lightRadius[" + std::to_string(i) + "]", lights[i].object.transform.scale.x);
     shader.setFloat("attenuation_exp[" + std::to_string(i) + "]", 1.0);
   }
 }
 
-void setEnvironment()
+void drawStaticScene()
 {
-  // Set Lights
-  lights.push_back(
-    Light(
-      Object(
-        glm::vec3(0.0f, 30.0f, 0.0f),
-        glm::vec3(0.0f),
-        glm::vec3(1.0f),
-        Material(
-          glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), // color: white
-          glm::vec3(1.0f),
-          glm::vec3(1.0f),
-          glm::vec3(1.0f),
-          0.0f
-        ),
-        sphereMesh
-      ),
-      0.5f
-    )
-  );
-
   // Ground
-  ground = Object(
-    glm::vec3(0.0f, 0.0f, 0.0f),
-    glm::vec3(90.0f, 0.0f, 0.0f),
-    glm::vec3(100.0f, 100.0f, 0.5f),
-    Material(
-      1.5f * glm::vec4(0.435f, 0.309f, 0.156f, 1.0f),   // Color
-      glm::vec3(0.5f),                                  // Ambient
-      glm::vec3(1.0f),                                  // Diffuse
-      glm::vec3(0.2f),                                  // Specular
-      1.0f
-    ),
-    cubeMesh
-  );
-}
-
-void drawEnvironment()
-{
-  // Draw General Objects
   phongShader->use();
   setUniforms_global(*phongShader);
   setUniforms_light(*phongShader);
@@ -136,91 +271,38 @@ void drawEnvironment()
   //cube->draw(phongShader);
   ground.draw(*phongShader);
 
-  // Draw Lights
-  lightShader->use();
-  setUniforms_global(*lightShader);
-  setUniforms_light(*lightShader);
+  // Lights
+  static std::vector<bool> b_drawLights = { true };
+  b_drawLights[0] = false;
   for (int i = 0; i < lights.size(); i++)
   {
-    lights[i].object.draw(*lightShader);
+    if (b_drawLights[i])
+    {
+      lightShader->use();
+      setUniforms_global(*lightShader);
+      setUniforms_light(*lightShader);
+      for (int i = 0; i < lights.size(); i++)
+        lights[i].object.draw(*lightShader);
+    }
   }
 }
 
-
-int main()
+void drawDynamicScene()
 {
-  glfwInit();
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-#ifdef __APPLE__
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-#endif
+  return;
+}
 
-  GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
-  if (window == NULL)
-  {
-    std::cout << "Failed to create GLFW window" << std::endl;
-    glfwTerminate();
-    return -1;
-  }
-  glfwMakeContextCurrent(window);
+void drawUI()
+{
+  return;
+}
 
-  // register callbacks
-  glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-  glfwSetScrollCallback(window, scroll_callback);
+void renderScene()
+{
+  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-  if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-  {
-    std::cout << "Failed to initialize GLAD" << std::endl;
-    return -1;
-  }
-
-  // settings
-  glEnable(GL_DEPTH_TEST);
-
-  // Shaders
-  phongShader = new Shader(SHADER_PATH "phong_vshader.glsl", SHADER_PATH "phong_fshader.glsl");
-  lightShader = new Shader(SHADER_PATH "light_vshader.glsl", SHADER_PATH "light_fshader.glsl");
-  cubemapShader = new Shader(SHADER_PATH "cubemap_vshader.glsl", SHADER_PATH "cubemap_fshader.glsl");
-
-  // Meshes
-  sphereMesh = ShapeGenerator::createSphere();
-  cubeMesh = ShapeGenerator::createCube();
-  quadMesh = ShapeGenerator::createQuad();
-
-  setEnvironment();
-
-  while (!glfwWindowShouldClose(window))
-  {
-    // Update time
-    float current_time = static_cast<float>(glfwGetTime());
-    dt = current_time - last_time;
-    last_time = current_time;
-    if (b_play)
-      accumulated_time += dt;
-
-    processInput(window);
-
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    drawEnvironment();
-
-    // draw something
-
-    glfwSwapBuffers(window);
-    glfwPollEvents();
-  }
-
-  delete phongShader;
-  delete lightShader;
-  delete cubemapShader;
-
-  delete sphereMesh;
-  delete cubeMesh;
-  delete quadMesh;
-
-  glfwTerminate();
-  return 0;
+  drawStaticScene();
+  drawDynamicScene();
+  drawUI();
 }

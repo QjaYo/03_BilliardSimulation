@@ -1,11 +1,11 @@
 #include "object.h"
 
-Object::Object()
-  : position(glm::vec3(0.0f)), rotation(glm::vec3(0.0f)), scale(glm::vec3(1.0f)), material(), mesh(nullptr)
-{}
-
-Object::Object(glm::vec3 position, glm::vec3 rotation, glm::vec3 scale, const Material &material, const Mesh *mesh)
-  : position(position), rotation(rotation), scale(scale), material(material), mesh(mesh) {}
+Object::Object(const TransformData &transform, const RenderData &render, const PhysicsData &physics)
+{
+  this->transform = transform;
+  this->render = render;
+  this->physics = physics;
+}
 
 Object::~Object() {
   ;
@@ -13,63 +13,64 @@ Object::~Object() {
 
 void Object::draw(const Shader &shader)
 {
-  // Model Matrix
-  glm::mat4 modelMatrix = glm::mat4(1.0f);
-  modelMatrix = glm::translate(modelMatrix, this->position);
-  modelMatrix = glm::rotate(modelMatrix, glm::radians(this->rotation.y), glm::vec3(0.0f, 1.0f, 0.0f)); // y axis
-  modelMatrix = glm::rotate(modelMatrix, glm::radians(this->rotation.x), glm::vec3(1.0f, 0.0f, 0.0f)); // x axis
-  modelMatrix = glm::rotate(modelMatrix, glm::radians(this->rotation.z), glm::vec3(0.0f, 0.0f, 1.0f)); // z axis
-  modelMatrix = glm::scale(modelMatrix, this->scale);
-  shader.setMat4("modelMatrix", modelMatrix);
-
-  // Material
-  shader.setMaterial("material", material);
-
-  int unit = 0;
-
-  shader.setBool("ACTIVATE_TEXTURE_DIFFUSE", material.useDiffuseMaps);
-  shader.setInt("n_TEXTURE_DIFFUSE", (int)material.diffuseMaps.size());
-  for (int i = 0; i < material.diffuseMaps.size(); i++)
-  {
-    material.diffuseMaps[i]->bind(unit);
-    shader.setInt("TEXTURE_DIFFUSE[" + std::to_string(i) + "]", unit++);
-  }
-
-  shader.setBool("ACTIVATE_TEXTURE_SPECULAR", material.useSpecularMaps);
-  shader.setInt("n_TEXTURE_SPECULAR", (int)material.specularMaps.size());
-  for (int i = 0; i < material.specularMaps.size(); i++)
-  {
-    material.specularMaps[i]->bind(unit);
-    shader.setInt("TEXTURE_SPECULAR[" + std::to_string(i) + "]", unit++);
-  }
-
-  shader.setBool("ACTIVATE_TEXTURE_NORMAL", material.useNormalMaps);
-  shader.setInt("n_TEXTURE_NORMAL", (int)material.normalMaps.size());
-  for (int i = 0; i < material.normalMaps.size(); i++)
-  {
-    material.normalMaps[i]->bind(unit);
-    shader.setInt("TEXTURE_NORMAL[" + std::to_string(i) + "]", unit++);
-  }
-
-  shader.setBool("ACTIVATE_TEXTURE_HEIGHT", material.useHeightMaps);
-  shader.setInt("n_TEXTURE_HEIGHT", (int)material.heightMaps.size());
-  for (int i = 0; i < material.heightMaps.size(); i++)
-  {
-    material.heightMaps[i]->bind(unit);
-    shader.setInt("TEXTURE_HEIGHT[" + std::to_string(i) + "]", unit++);
-  }
-
-  shader.setInt("n_TEXTURE_OTHER", (int)material.otherMaps.size());
-  for (int i = 0; i < material.otherMaps.size(); i++)
-  {
-    material.otherMaps[i]->bind(unit);
-    shader.setInt("TEXTURE_OTHER[" + std::to_string(i) + "]", unit++);
-  }
-
-  if (mesh == nullptr)
+  if (render.mesh == nullptr || render.material == nullptr)
   {
     return;
   }
+  const Material& mat = *render.material;
 
-  mesh->draw(shader);
+  // Model Matrix
+  glm::mat4 modelMatrix = glm::mat4(1.0f);
+  modelMatrix = glm::translate(modelMatrix, transform.position);
+  modelMatrix = glm::rotate(modelMatrix, glm::radians(transform.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f)); // y axis
+  modelMatrix = glm::rotate(modelMatrix, glm::radians(transform.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f)); // x axis
+  modelMatrix = glm::rotate(modelMatrix, glm::radians(transform.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f)); // z axis
+  modelMatrix = glm::scale(modelMatrix, transform.scale);
+  shader.setMat4("modelMatrix", modelMatrix);
+
+  // Material
+  shader.setMaterial("material", mat);
+
+  int unit = 0;
+
+  shader.setBool("ACTIVATE_TEXTURE_DIFFUSE", mat.useDiffuseMaps);
+  shader.setInt("n_TEXTURE_DIFFUSE", (int)mat.diffuseMaps.size());
+  for (size_t i = 0; i < mat.diffuseMaps.size(); i++)
+  {
+    mat.diffuseMaps[i]->bind(unit);
+    shader.setInt("TEXTURE_DIFFUSE[" + std::to_string(i) + "]", unit++);
+  }
+
+  shader.setBool("ACTIVATE_TEXTURE_SPECULAR", mat.useSpecularMaps);
+  shader.setInt("n_TEXTURE_SPECULAR", (int)mat.specularMaps.size());
+  for (size_t i = 0; i < mat.specularMaps.size(); i++)
+  {
+    mat.specularMaps[i]->bind(unit);
+    shader.setInt("TEXTURE_SPECULAR[" + std::to_string(i) + "]", unit++);
+  }
+
+  shader.setBool("ACTIVATE_TEXTURE_NORMAL", mat.useNormalMaps);
+  shader.setInt("n_TEXTURE_NORMAL", (int)mat.normalMaps.size());
+  for (size_t i = 0; i < mat.normalMaps.size(); i++)
+  {
+    mat.normalMaps[i]->bind(unit);
+    shader.setInt("TEXTURE_NORMAL[" + std::to_string(i) + "]", unit++);
+  }
+
+  shader.setBool("ACTIVATE_TEXTURE_HEIGHT", mat.useHeightMaps);
+  shader.setInt("n_TEXTURE_HEIGHT", (int)mat.heightMaps.size());
+  for (size_t i = 0; i < mat.heightMaps.size(); i++)
+  {
+    mat.heightMaps[i]->bind(unit);
+    shader.setInt("TEXTURE_HEIGHT[" + std::to_string(i) + "]", unit++);
+  }
+
+  shader.setInt("n_TEXTURE_OTHER", (int)mat.otherMaps.size());
+  for (size_t i = 0; i < mat.otherMaps.size(); i++)
+  {
+    mat.otherMaps[i]->bind(unit);
+    shader.setInt("TEXTURE_OTHER[" + std::to_string(i) + "]", unit++);
+  }
+
+  render.mesh->draw(shader);
 }
