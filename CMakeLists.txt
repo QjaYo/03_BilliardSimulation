@@ -26,6 +26,7 @@ add_executable(${PROJECT_NAME}
   sources/texture.cpp
   sources/material.cpp
   sources/object.cpp
+  sources/component.cpp
   sources/light.cpp
 
   externals/glad/src/glad.c

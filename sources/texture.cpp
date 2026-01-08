@@ -68,6 +68,7 @@ void Texture::loadCubeMap(const std::vector<std::string> &facePaths)
     unsigned char *data = stbi_load(facePaths[i].c_str(), &width, &height, &nrChannels, 0);
     if (data)
     {
+      std::cout << "Successfully loaded: " << facePaths[i] << std::endl;
       GLenum format;
       if (nrChannels == 1)
         format = GL_RED;
@@ -81,7 +82,9 @@ void Texture::loadCubeMap(const std::vector<std::string> &facePaths)
       glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
     }
     else
+    {
       std::cout << "CubeMap failed to load at: " << facePaths[i] << std::endl;
+    }
     stbi_image_free(data);
   }
 

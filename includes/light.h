@@ -2,12 +2,15 @@
 
 #include <glm/glm.hpp>
 
+#include "component.h"
 #include "object.h"
 
-struct Light
+class Light
 {
-  Object object;
+public:
   float intensity;
+  Component component;
 
-  Light(const Object &object, const float i);
+  Light() = default;
+  Light(const Component &c, const float i);
 };

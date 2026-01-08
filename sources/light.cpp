@@ -1,4 +1,4 @@
 #include "light.h"
 
-Light::Light(const Object &obj, const float i)
-  : object(obj), intensity(i) {}
+Light::Light(const Component &c, const float i)
+  : component(c), intensity(i) {}

@@ -160,10 +160,10 @@ void Shader::setMaterial(const std::string &name, const Material &material) cons
 
 void Shader::setLight(const std::string &name, const Light &light) const
 {
-  setVec4(name + ".position", glm::vec4(light.object.transform.position, 1.0f));
-  if (light.object.render.material)
+  setVec4(name + ".position", glm::vec4(light.component.transform.position, 1.0f));
+  if (light.component.render.material)
   {
-    setVec4(name + ".color", light.object.render.material->color);
+    setVec4(name + ".color", light.component.render.material->color);
   }
   setFloat(name + ".intensity", light.intensity);
 }

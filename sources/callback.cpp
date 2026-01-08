@@ -13,11 +13,11 @@ extern float fovy;
 extern float pitch;
 extern float yaw;
 extern float roll;
+extern float cameraSpeed;
 
 static bool wasSpaceKeyPressed = false;
 static bool isMouseRightDragging = false;
 static double lastX = 400.0, lastY = 300.0;
-static float cameraSpeed = 0.15f;
 static float rollSpeed = 1.0f;
 
 void processInput(GLFWwindow *window)

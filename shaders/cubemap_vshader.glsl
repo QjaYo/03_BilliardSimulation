@@ -9,10 +9,10 @@ uniform mat4 viewMatrix;
 
 void main()
 {
-  fTexCoords = vPosition * 2.0;
-  //fTexCoords = vPosition;
+  fTexCoords = vPosition;
 
-  //mat4 staticView = mat4(mat3(viewMatrix));
-  vec4 pos = projMatrix * viewMatrix * vec4(vPosition, 1.0);
+  mat4 staticViewMatrix = mat4(mat3(viewMatrix));
+  //vec4 pos = projMatrix * viewMatrix * vec4(vPosition, 1.0);
+  vec4 pos = projMatrix * staticViewMatrix * vec4(vPosition, 1.0);
   gl_Position = pos.xyww;
 }

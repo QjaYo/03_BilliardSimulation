@@ -19,6 +19,7 @@
 #include "constant.h"
 #include "light.h"
 #include "texture.h"
+#include "component.h"
 #include "object.h"
 
 // settings
@@ -39,15 +40,24 @@ float roll = 0.0f;
 glm::vec3 cameraFront = glm::vec3(0.0f, sin(glm::radians(pitch)), -cos(glm::radians(pitch)));
 glm::vec3 cameraPosition = glm::vec3(0.0f, 30.0f, 50.0f);
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+float cameraSpeed = 0.4f;
+
+//Objects
+Object billiardTable;
+
+// Components & Properities
+Component _felt;
+std::array<Component, 4> _rails;
+Component _billiardTable;
+std::vector<Component> _balls;
+
+// Lights
+std::vector<Light> lights;
 
 // Time variables
 float dt = 0.0f;
 float last_time = 0.0f;
 float accumulated_time = 0.0f;
-
-// Environments
-Object ground;
-std::vector<Light> lights;
 
 // Shaders
 Shader *phongShader;
@@ -62,7 +72,11 @@ Mesh *quadMesh;
 // Materials
 Material *redBilliardBallMaterial;
 Material *whiteLightMaterial;
-Material *groundMaterial;
+Material *feltMaterial;
+Material *railMaterial;
+
+// Textures
+Texture *skyboxTexture;
 
 // Function Declarations
 GLFWwindow *initOpenGL(const std::string &title, int width, int height);
@@ -71,6 +85,9 @@ void initShaders();
 void initMeshes();
 void initMaterials();
 void initObjects();
+void initLights();
+void initBilliardTable();
+void initSkybox();
 
 void update();
 void updateTime();
@@ -84,6 +101,8 @@ void drawUI();
 void setUniforms_global(Shader &shader);
 void setUniforms_light(Shader &shader);
 
+void deleteResources();
+
 int main()
 {
   window = initOpenGL("OpenGL Project", SCR_WIDTH, SCR_HEIGHT);
@@ -96,6 +115,7 @@ int main()
   initMeshes();
   initMaterials();
   initObjects();
+  initSkybox();
 
   while (!glfwWindowShouldClose(window))
   {
@@ -107,18 +127,11 @@ int main()
     glfwPollEvents();
   }
 
-  delete phongShader;
-  delete lightShader;
-  delete cubemapShader;
-
-  delete sphereMesh;
-  delete cubeMesh;
-  delete quadMesh;
+  deleteResources();
 
   glfwTerminate();
   return 0;
 }
-
 
 GLFWwindow *initOpenGL(const std::string &title, int width, int height)
 {
@@ -186,21 +199,29 @@ void initMaterials()
     72.0f
   );
 
-  groundMaterial = new Material(
-    glm::vec4(0.4f, 0.6f, 0.3f, 1.0f),
-    glm::vec3(0.1f),
+  feltMaterial = new Material(
+    glm::vec4(0.183f, 0.313f, 0.141f, 1.0f),
+    glm::vec3(0.2f),
     glm::vec3(0.5f),
     glm::vec3(0.0f),
     72.0f
   );
+
+  railMaterial = new Material(
+    glm::vec4(0.345f, 0.156f, 0.06f, 1.0f),
+    glm::vec3(0.2f),
+    glm::vec3(0.5f),
+    glm::vec3(0.0f),
+    36.0f
+  );
 }
 
-void initObjects()
+void initLights()
 {
   // Set Lights
   lights.push_back(
     Light(
-      Object(
+      Component(
         TransformData { glm::vec3(0.0f, 30.0f, 0.0f), glm::vec3(0.0f), glm::vec3(1.0f) },
         RenderData { lightShader, sphereMesh, whiteLightMaterial },
         PhysicsData {}
@@ -208,15 +229,78 @@ void initObjects()
       1.0f
     )
   );
-
-  // Ground
-  ground = Object(
-    TransformData { glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(90.0f, 0.0f, 0.0f), glm::vec3(100.0f, 100.0f, 0.5f) },
-    RenderData { phongShader, cubeMesh, groundMaterial },
-    PhysicsData {}
-  );
 }
 
+void initObjects()
+{
+  initLights();
+
+  // Felts
+  _felt = Component(
+    TransformData { glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(100.0f, 100.0f, 0.5f) },
+    RenderData { phongShader, cubeMesh, feltMaterial },
+    PhysicsData {}
+  );
+
+  // Rails
+  float railThickness = 2.0f;
+  float railDepth = 5.0f;
+  for (auto i = 0; i < _rails.size(); i++)
+  {
+    float ang = i * 90.0f;
+    float rad = glm::radians(ang);
+    _rails[i] = Component(
+      TransformData {
+        glm::vec3((_felt.transform.scale.x + railThickness) / 2.0f * cos(rad), (_felt.transform.scale.y + railThickness) / 2.0f * sin(rad), 0.0f),
+        glm::vec3(0.0f, 0.0f, ang),
+        glm::vec3(railThickness, _felt.transform.scale.y + glm::abs(railThickness * 2.0f * cos(rad)), railDepth)
+      },
+      RenderData { phongShader, cubeMesh, railMaterial },
+      PhysicsData {}
+    );
+  }
+
+  // BilliardTable
+  _billiardTable = Component(
+    TransformData { glm::vec3(0.0f), glm::vec3(90.0f, 0.0f, 0.0f), glm::vec3(1.0f) },
+    RenderData {},
+    PhysicsData {}
+  );
+  _billiardTable.addChild(&_felt);
+  for (auto i = 0; i < _rails.size(); i++)
+    _billiardTable.addChild(&_rails[i]);
+
+  billiardTable = Object("BilliardTable", &_billiardTable);
+
+  // Balls
+  int n_ball = 1;
+  for (auto i = 0; i < n_ball; i++)
+  {
+    float radius = 1.0f;
+    _balls.push_back(
+      Component(
+        TransformData { glm::vec3(0.0f, 0.0f, -(billiardTable.root->transform.scale.z / 2.0f + radius)), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(radius) },
+        RenderData { phongShader, sphereMesh, redBilliardBallMaterial },
+        PhysicsData { 1.0f, glm::vec3(0.2f, 0.3f, 0.2f), glm::vec3(0.0f), glm::vec3(0.0f), 0.0f }
+      )
+    );
+    _billiardTable.addChild(&_balls[0]);
+  }
+}
+
+void initSkybox()
+{
+  std::vector<std::string> faces {
+    TEXTURE_PATH "skybox_universe.jpg",
+    TEXTURE_PATH "skybox_universe.jpg",
+    TEXTURE_PATH "skybox_universe.jpg",
+    TEXTURE_PATH "skybox_universe.jpg",
+    TEXTURE_PATH "skybox_universe.jpg",
+    TEXTURE_PATH "skybox_universe.jpg"
+  };
+  skyboxTexture = new Texture("skybox_universe");
+  skyboxTexture->loadCubeMap(faces);
+}
 
 void updateTime()
 {
@@ -256,39 +340,54 @@ void setUniforms_light(Shader &shader)
   {
     std::string name = "lights[" + std::to_string(i) + "]";
     shader.setLight(name, lights[i]);
-    shader.setFloat("lightRadius[" + std::to_string(i) + "]", lights[i].object.transform.scale.x);
+    shader.setFloat("lightRadius[" + std::to_string(i) + "]", lights[i].component.transform.scale.x);
     shader.setFloat("attenuation_exp[" + std::to_string(i) + "]", 1.0);
   }
 }
 
 void drawStaticScene()
 {
-  // Ground
-  phongShader->use();
-  setUniforms_global(*phongShader);
-  setUniforms_light(*phongShader);
-  //sphere->draw(phongShader);
-  //cube->draw(phongShader);
-  ground.draw(*phongShader);
-
   // Lights
+  lightShader->use();
   static std::vector<bool> b_drawLights = { true };
   b_drawLights[0] = false;
   for (int i = 0; i < lights.size(); i++)
   {
     if (b_drawLights[i])
     {
-      lightShader->use();
       setUniforms_global(*lightShader);
       setUniforms_light(*lightShader);
       for (int i = 0; i < lights.size(); i++)
-        lights[i].object.draw(*lightShader);
+        lights[i].component.draw(*lightShader, glm::mat4(1.0f));
     }
   }
+
+  // Skybox
+  cubemapShader->use();
+  glDepthFunc(GL_LEQUAL);
+  cubemapShader->use();
+  setUniforms_global(*cubemapShader);
+  if (skyboxTexture != nullptr)
+  {
+    int textureUnit = 0;
+    skyboxTexture->bind(textureUnit);
+    cubemapShader->setInt("cubemap", textureUnit);
+  }
+  if (cubeMesh != nullptr)
+  {
+    cubeMesh->draw(*cubemapShader);
+  }
+  glDepthFunc(GL_LESS);
+
 }
 
 void drawDynamicScene()
 {
+  phongShader->use();
+  setUniforms_global(*phongShader);
+  setUniforms_light(*phongShader);
+  billiardTable.draw(*phongShader);
+
   return;
 }
 
@@ -305,4 +404,23 @@ void renderScene()
   drawStaticScene();
   drawDynamicScene();
   drawUI();
+}
+
+void deleteResources()
+{
+
+  delete phongShader;
+  delete lightShader;
+  delete cubemapShader;
+
+  delete sphereMesh;
+  delete cubeMesh;
+  delete quadMesh;
+
+  delete skyboxTexture;
+
+  delete redBilliardBallMaterial;
+  delete whiteLightMaterial;
+  delete feltMaterial;
+  delete railMaterial;
 }
